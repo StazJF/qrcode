@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Ticket Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode" defer></script>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: #eef2f6;
+            color: #172033;
+        }
+
+        main {
+            width: min(880px, calc(100% - 32px));
+            margin: 32px auto;
+        }
+
+        header {
+            margin-bottom: 20px;
+        }
+
+        #reader {
+            overflow: hidden;
+            min-height: 320px;
+            background: #ffffff;
+            border: 1px solid #c9d3df;
+            border-radius: 8px;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 16px;
+            background: #ffffff;
+            border-left: 8px solid #64748b;
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
+        }
+
+        #result.success {
+            border-color: #15803d;
+        }
+
+        #result.warning {
+            border-color: #ca8a04;
+        }
+
+        #result.error {
+            border-color: #dc2626;
+        }
+
+        dl {
+            display: grid;
+            grid-template-columns: minmax(110px, 160px) 1fr;
+            gap: 8px 16px;
+            margin: 12px 0 0;
+        }
+
+        dt {
+            font-weight: 700;
+        }
+
+        dd {
+            margin: 0;
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>Admin Ticket Scanner</h1>
+    </header>
+
+    <section id="reader" aria-label="QR scanner"></section>
+    <section id="result" aria-live="polite">
+        <strong>Ready to scan.</strong>
+    </section>
+</main>
+
+<script>
+    const resultElement = document.getElementById('result');
+    let lastToken = '';
+    let isProcessing = false;
+
+    function setResult(state, title, payload = null) {
+        resultElement.className = state;
+        resultElement.replaceChildren();
+
+        const heading = document.createElement('strong');
+        heading.textContent = title;
+        resultElement.append(heading);
+
+        if (payload === null) {
+            return;
+        }
+
+        const list = document.createElement('dl');
+
+        for (const [key, value] of Object.entries(payload)) {
+            const term = document.createElement('dt');
+            term.textContent = key;
+
+            const description = document.createElement('dd');
+            description.textContent = value === null ? '' : String(value);
+
+            list.append(term, description);
+        }
+
+        resultElement.append(list);
+    }
+
+    function extractToken(scannedText) {
+        const trimmedText = scannedText.trim();
+        const tokenMatch = trimmedText.match(/[a-f0-9]{64}/i);
+
+        return tokenMatch === null ? null : tokenMatch[0].toLowerCase();
+    }
+
+    async function validateTicket(scannedText) {
+        const token = extractToken(scannedText);
+
+        if (token === null) {
+            setResult('error', 'Invalid QR payload.');
+            return;
+        }
+
+        if (isProcessing || token === lastToken) {
+            return;
+        }
+
+        isProcessing = true;
+        lastToken = token;
+        setResult('warning', 'Checking ticket...');
+
+        try {
+            const response = await fetch(`check.php?token=${encodeURIComponent(token)}`, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/json',
+                },
+            });
+            const payload = await response.json();
+            const state = response.ok ? 'success' : response.status === 409 ? 'warning' : 'error';
+
+            setResult(state, payload.message, {
+                Status: payload.status,
+                Name: payload.ticket?.userName ?? null,
+                Email: payload.ticket?.userEmail ?? null,
+                'Checked in at': payload.ticket?.checkedInAt ?? null,
+            });
+        } catch (error) {
+            setResult('error', 'Unable to validate ticket.');
+        } finally {
+            window.setTimeout(() => {
+                isProcessing = false;
+                lastToken = '';
+            }, 2500);
+        }
+    }
+
+    window.addEventListener('load', () => {
+        const scanner = new Html5QrcodeScanner(
+            'reader',
+            {
+                fps: 10,
+                qrbox: {
+                    width: 260,
+                    height: 260,
+                },
+            },
+            false,
+        );
+
+        scanner.render(validateTicket);
+    });
+</script>
+</body>
+</html>
