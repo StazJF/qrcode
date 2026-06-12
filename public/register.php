@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 use App\Database;
 use App\Config\DatabaseConfig;
+use App\Runtime\ErrorDisplay;
 use App\TicketService;
 use App\View\Html;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\Writer\PngWriter;
+
+require_once dirname(__DIR__) . '/src/Runtime/ErrorDisplay.php';
+
+ErrorDisplay::configureForBrowser();
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 

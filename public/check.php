@@ -5,7 +5,12 @@ declare(strict_types=1);
 use App\Database;
 use App\Config\DatabaseConfig;
 use App\Http\JsonResponder;
+use App\Runtime\ErrorDisplay;
 use App\TicketService;
+
+require_once dirname(__DIR__) . '/src/Runtime/ErrorDisplay.php';
+
+ErrorDisplay::configureForBrowser();
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
